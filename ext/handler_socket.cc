@@ -126,6 +126,30 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
     return INT2FIX(ptr->get_error_code());
 }
 
+VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
+{
+    VALUE ret, val;
+
+    if (NIL_P(ary) || RARRAY_LEN(ary) == 0) {
+        return ary;
+    }
+
+    ret = rb_ary_new2(RARRAY_LEN(ary));
+    vec.reserve(RARRAY_LEN(ary));
+
+    for (size_t i=0; i<RARRAY_LEN(ary); i++) {
+        val = rb_ary_entry(ary, i);
+        if (FIXNUM_P(val)) {
+            val = rb_fix2str(val, 10);
+        }
+        StringValue(val);
+        vec.push_back(dena::string_ref(RSTRING_PTR(val), RSTRING_LEN(val)));
+        rb_ary_push(ret, val);
+    }
+
+    return ret;
+}
+
 VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 {
     HandlerSocket* hs;
@@ -140,33 +164,19 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 
     if (!NIL_P(modop)) {
         StringValue(modop);
-        Check_Type(modvals, T_ARRAY);
     }
 
-    dena::string_ref op_ref;
-    std::vector<dena::string_ref> keyary;
+    dena::string_ref op_ref, modop_ref;
+    std::vector<dena::string_ref> keyary, modary;
 
     op_ref = dena::string_ref(RSTRING_PTR(op), RSTRING_LEN(op));
-
-    keyary.reserve(RARRAY_LEN(keys));
-    for (size_t i=0; i<RARRAY_LEN(keys); i++) {
-        VALUE key = rb_ary_entry(keys, i);
-        StringValuePtr(key);
-        keyary.push_back(dena::string_ref(RSTRING_PTR(key), RSTRING_LEN(key)));
-    }
-
-    dena::string_ref modop_ref;
-    std::vector<dena::string_ref> modary;
+    keys = ary_to_vector(keys, keyary);
+    rb_gc_register_address(&keys);
 
     if (!NIL_P(modop)) {
         modop_ref = dena::string_ref(RSTRING_PTR(modop), RSTRING_LEN(modop));
-
-        modary.reserve(RARRAY_LEN(modvals));
-        for (size_t i=0; i<RARRAY_LEN(modvals); i++) {
-            VALUE key = rb_ary_entry(modvals, i);
-            // StringValue(key);
-            modary.push_back(dena::string_ref(RSTRING_PTR(key), RSTRING_LEN(key)));
-        }
+        modvals = ary_to_vector(modvals, modary);
+        rb_gc_register_address(&modvals);
     }
 
     ptr->request_buf_exec_generic(NUM2INT(id),
@@ -178,6 +188,12 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 
     if (ptr->request_send() != 0) {
         return Qnil;
+    }
+
+    rb_gc_unregister_address(&keys);
+
+    if (!NIL_P(modop)) {
+        rb_gc_unregister_address(&modvals);
     }
 
     size_t nflds = 0;
@@ -229,43 +245,144 @@ VALUE hs_execute_multi(int argc, VALUE *argv, VALUE self)
     Data_Get_Struct(self, HandlerSocket, hs);
     dena::hstcpcli_i *const ptr = hs->ptr;
 
-    return Qnil;
+    VALUE exec_args, exec_arg;
+
+    VALUE id, op, keys, limit, skip, modop, modvals;
+    int arg = rb_scan_args(argc, argv, "16", &id, &op, &keys, &limit, &skip, &modop, &modvals);
+    if (arg >= 5) {
+        VALUE tmp = rb_ary_new3(id, op, keys, limit, skip, modop, modvals);
+        exec_args = rb_ary_new3(tmp);
+    } else if (arg == 1) {
+        Check_Type(id, T_ARRAY);
+        exec_args = id;
+    } else {
+        rb_raise(rb_eArgError, "wrong number of arguments");
+    }
+
+    for (size_t i=0; i<RARRAY_LEN(exec_args); i++) {
+        exec_arg = rb_ary_entry(exec_args, i);
+        Check_Type(exec_arg, T_ARRAY);
+
+        id      = rb_ary_entry(exec_arg, 0);
+        op      = rb_ary_entry(exec_arg, 1);
+        keys    = rb_ary_entry(exec_arg, 2);
+        limit   = rb_ary_entry(exec_arg, 3);
+        skip    = rb_ary_entry(exec_arg, 4);
+        modop   = rb_ary_entry(exec_arg, 5);
+        modvals = rb_ary_entry(exec_arg, 6);
+
+        StringValue(op);
+        Check_Type(keys, T_ARRAY);
+
+        if (!NIL_P(modop)) {
+            StringValue(modop);
+        }
+
+        dena::string_ref op_ref, modop_ref;
+        std::vector<dena::string_ref> keyary, modary;
+
+        op_ref = dena::string_ref(RSTRING_PTR(op), RSTRING_LEN(op));
+        keys = ary_to_vector(keys, keyary);
+        rb_gc_register_address(&keys);
+
+        if (!NIL_P(modop)) {
+            modop_ref = dena::string_ref(RSTRING_PTR(modop), RSTRING_LEN(modop));
+            modvals = ary_to_vector(modvals, modary);
+            rb_gc_register_address(&modvals);
+        }
+
+        ptr->request_buf_exec_generic(NUM2INT(id),
+                                      op_ref,
+                                      &keyary[0], keyary.size(),
+                                      NUM2INT(limit), NUM2INT(skip),
+                                      modop_ref,
+                                      &modary[0], modary.size());
+    }
+
+    VALUE retvals, retval;
+    retvals = rb_ary_new();
+
+    if (ptr->request_send() < 0) {
+        retval = rb_ary_new();
+
+        const int e = ptr->get_error_code();
+        const std::string s = ptr->get_error();
+        rb_ary_push(retval, FIX2INT(e));
+        rb_ary_push(retval, rb_str_new2(s.c_str()));
+
+        rb_ary_push(retvals, retval);
+        return retvals;
+    }
+
+    for (size_t i=0; i<RARRAY_LEN(exec_args); i++) {
+        retval = rb_ary_new();
+
+        size_t nflds = 0;
+        const int e = ptr->response_recv(nflds);
+        rb_ary_push(retval, FIX2INT(e));
+        if (e != 0) {
+            const std::string s = ptr->get_error();
+            rb_ary_push(retval, rb_str_new2(s.c_str()));
+        } else {
+            VALUE arys, ary, val;
+
+            arys = rb_ary_new();
+            const dena::string_ref *row = 0;
+            while ((row = ptr->get_next_row()) != 0) {
+                // fprintf(stderr, "row=%p\n", row);
+                ary = rb_ary_new2(nflds);
+                for (size_t i = 0; i < nflds; ++i) {
+                    const dena::string_ref& v = row[i];
+                    // fprintf(stderr, "FLD %zu v=%s vbegin=%p\n", i, std::string(v.begin(), v.size()).c_str(), v.begin());
+                    if (v.begin() != 0) {
+                        val = rb_str_new(v.begin(), v.size());
+                        rb_ary_push(ary, val);
+                    } else {
+                        rb_ary_push(ary, Qnil);
+                    }
+                }
+                rb_ary_push(arys, ary);
+            }
+            rb_ary_push(retval, arys);
+        }
+
+        if (e >= 0) {
+            ptr->response_buf_remove();
+        }
+
+        rb_ary_push(retvals, retval);
+
+        if (e < 0) {
+            return retvals;
+        }
+    }
+
+    return retvals;
 }
 
-VALUE hs_execute_find(int argc, VALUE *argv, VALUE self)
-{
-    HandlerSocket* hs;
-    Data_Get_Struct(self, HandlerSocket, hs);
-    dena::hstcpcli_i *const ptr = hs->ptr;
 
-    return Qnil;
+VALUE hs_execute_update(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modvals)
+{
+    VALUE argv[7] = {
+        id, op, keys, limit, skip, rb_str_new2("U"), modvals,
+    };
+    return hs_execute_single(7, argv, self);
 }
 
-VALUE hs_execute_update(int argc, VALUE *argv, VALUE self)
+VALUE hs_execute_delete(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip)
 {
-    HandlerSocket* hs;
-    Data_Get_Struct(self, HandlerSocket, hs);
-    dena::hstcpcli_i *const ptr = hs->ptr;
-
-    return Qnil;
+    VALUE argv[7] = {
+        id, op, keys, limit, skip, rb_str_new2("D"), Qnil,
+    };
+    return hs_execute_single(7, argv, self);
 }
 
-VALUE hs_execute_delete(int argc, VALUE *argv, VALUE self)
+VALUE hs_execute_insert(VALUE self, VALUE id, VALUE fvals)
 {
-    HandlerSocket* hs;
-    Data_Get_Struct(self, HandlerSocket, hs);
-    dena::hstcpcli_i *const ptr = hs->ptr;
-
-    return Qnil;
-}
-
-VALUE hs_execute_insert(int argc, VALUE *argv, VALUE self)
-{
-    HandlerSocket* hs;
-    Data_Get_Struct(self, HandlerSocket, hs);
-    dena::hstcpcli_i *const ptr = hs->ptr;
-
-    return Qnil;
+    VALUE argv[5] = {
+        id, rb_str_new2("+"), fvals, 0, 0,
+    };
+    return hs_execute_single(5, argv, self);
 }
 
 void parse_options(dena::config& conf, dena::socket_args& args, VALUE options)
@@ -337,9 +454,9 @@ extern "C" {
         rb_define_method(rb_cHandlerSocket, "open_index", (VALUE(*)(...))hs_open_index, 5);
         rb_define_method(rb_cHandlerSocket, "execute_single", (VALUE(*)(...))hs_execute_single, -1);
         rb_define_method(rb_cHandlerSocket, "execute_multi", (VALUE(*)(...))hs_execute_multi, -1);
-        rb_define_method(rb_cHandlerSocket, "execute_find", (VALUE(*)(...))hs_execute_find, -1);
-        rb_define_method(rb_cHandlerSocket, "execute_update", (VALUE(*)(...))hs_execute_update, -1);
-        rb_define_method(rb_cHandlerSocket, "execute_delete", (VALUE(*)(...))hs_execute_delete, -1);
-        rb_define_method(rb_cHandlerSocket, "execute_insert", (VALUE(*)(...))hs_execute_insert, -1);
+        rb_define_alias(rb_cHandlerSocket, "execute_find", "execute_single");
+        rb_define_method(rb_cHandlerSocket, "execute_update", (VALUE(*)(...))hs_execute_update, 6);
+        rb_define_method(rb_cHandlerSocket, "execute_delete", (VALUE(*)(...))hs_execute_delete, 5);
+        rb_define_method(rb_cHandlerSocket, "execute_insert", (VALUE(*)(...))hs_execute_insert, 2);
     }
 }
