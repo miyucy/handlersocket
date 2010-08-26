@@ -9,9 +9,9 @@ void parse_options(dena::config&, dena::socket_args&, VALUE);
 
 VALUE hs_free(HandlerSocket* hs)
 {
-    fprintf(stderr, "hs=%p\n", hs);
+    // fprintf(stderr, "hs=%p\n", hs);
     if (hs) {
-        fprintf(stderr, "hs->ptr=%p\n", hs->ptr);
+        // fprintf(stderr, "hs->ptr=%p\n", hs->ptr);
         if (hs->ptr) {
             hs->ptr->close();
             delete hs->ptr;
@@ -30,12 +30,12 @@ VALUE hs_initialize(VALUE self, VALUE options)
     HandlerSocket* hs;
 
     Data_Get_Struct(self, HandlerSocket, hs);
-    fprintf(stderr, "hs=%p\n", hs);
+    // fprintf(stderr, "hs=%p\n", hs);
     if (!hs) {
         hs = (HandlerSocket*)xmalloc(sizeof(HandlerSocket));
         MEMZERO(hs, HandlerSocket, 1);
         DATA_PTR(self) = hs;
-        fprintf(stderr, "hs=%p\n", hs);
+        // fprintf(stderr, "hs=%p\n", hs);
     }
 
     dena::config      conf;
@@ -43,10 +43,10 @@ VALUE hs_initialize(VALUE self, VALUE options)
     parse_options(conf, args, options);
 
     dena::hstcpcli_ptr ptr = dena::hstcpcli_i::create(args);
-    fprintf(stderr, "ptr=%p\n", &ptr);
+    // fprintf(stderr, "ptr=%p\n", &ptr);
     hs->ptr = ptr.get();
-    fprintf(stderr, "hs->ptr=%p\n", hs->ptr);
-    fprintf(stderr, "ptr.get()=%p\n", ptr.get());
+    // fprintf(stderr, "hs->ptr=%p\n", hs->ptr);
+    // fprintf(stderr, "ptr.get()=%p\n", ptr.get());
     ptr.release();
 
     return self;
@@ -116,11 +116,11 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
         size_t nflds = 0;
         ptr->response_recv(nflds);
         const int e = ptr->get_error_code();
-        fprintf(stderr, "errcode=%d\n", e);
+        // fprintf(stderr, "errcode=%d\n", e);
         if (e >= 0) {
             ptr->response_buf_remove();
         }
-        fprintf(stderr, "errcode=%d\n", ptr->get_error_code());
+        // fprintf(stderr, "errcode=%d\n", ptr->get_error_code());
     } while(0);
 
     return INT2FIX(ptr->get_error_code());
@@ -182,12 +182,12 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 
     size_t nflds = 0;
     ptr->response_recv(nflds);
-    fprintf(stderr, "nflds=%zu\n", nflds);
+    // fprintf(stderr, "nflds=%zu\n", nflds);
 
     VALUE retval = rb_ary_new();
 
     const int e = ptr->get_error_code();
-    fprintf(stderr, "e=%d nflds=%zu\n", e, nflds);
+    // fprintf(stderr, "e=%d nflds=%zu\n", e, nflds);
     rb_ary_push(retval, FIX2INT(e));
 
     if (e != 0) {
@@ -199,11 +199,11 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
         arys = rb_ary_new();
         const dena::string_ref *row = 0;
         while ((row = ptr->get_next_row()) != 0) {
-            fprintf(stderr, "row=%p\n", row);
+            // fprintf(stderr, "row=%p\n", row);
             ary = rb_ary_new2(nflds);
             for (size_t i = 0; i < nflds; ++i) {
                 const dena::string_ref& v = row[i];
-                fprintf(stderr, "FLD %zu v=%s vbegin=%p\n", i, std::string(v.begin(), v.size()).c_str(), v.begin());
+                // fprintf(stderr, "FLD %zu v=%s vbegin=%p\n", i, std::string(v.begin(), v.size()).c_str(), v.begin());
                 if (v.begin() != 0) {
                     val = rb_str_new(v.begin(), v.size());
                     rb_ary_push(ary, val);
@@ -278,42 +278,42 @@ void parse_options(dena::config& conf, dena::socket_args& args, VALUE options)
     if(val != Qnil)
     {
         conf["host"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "host=%s\n", conf["host"].c_str());
+        // fprintf(stderr, "host=%s\n", conf["host"].c_str());
     }
 
     val = rb_hash_aref(options, ID2SYM(rb_intern("port")));
     if(val != Qnil)
     {
         conf["port"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "port=%s\n", conf["port"].c_str());
+        // fprintf(stderr, "port=%s\n", conf["port"].c_str());
     }
 
     val = rb_hash_aref(options, ID2SYM(rb_intern("timeout")));
     if(val != Qnil)
     {
         conf["timeout"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "timeout=%s\n", conf["timeout"].c_str());
+        // fprintf(stderr, "timeout=%s\n", conf["timeout"].c_str());
     }
 
     val = rb_hash_aref(options, ID2SYM(rb_intern("listen_backlog")));
     if(val != Qnil)
     {
         conf["listen_backlog"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "listen_backlog=%s\n", conf["listen_backlog"].c_str());
+        // fprintf(stderr, "listen_backlog=%s\n", conf["listen_backlog"].c_str());
     }
 
     val = rb_hash_aref(options, ID2SYM(rb_intern("sndbuf")));
     if(val != Qnil)
     {
         conf["sndbuf"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "sndbuf=%s\n", conf["sndbuf"].c_str());
+        // fprintf(stderr, "sndbuf=%s\n", conf["sndbuf"].c_str());
     }
 
     val = rb_hash_aref(options, ID2SYM(rb_intern("rcvbuf")));
     if(val != Qnil)
     {
         conf["rcvbuf"] = std::string(StringValuePtr(val));
-        fprintf(stderr, "rcvbuf=%s\n", conf["rcvbuf"].c_str());
+        // fprintf(stderr, "rcvbuf=%s\n", conf["rcvbuf"].c_str());
     }
 
     args.set(conf);
