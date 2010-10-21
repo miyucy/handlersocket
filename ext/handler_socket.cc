@@ -150,6 +150,7 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
         _index  = rb_obj_dup(index),
         _fields = rb_obj_dup(fields);
     size_t nflds;
+    int   result;
 
     ptr->request_buf_open_index(_id,
                                 StringValueCStr(_db),
@@ -165,14 +166,9 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
         return hs_error_code(self);
     }
 
-    if (ptr->response_recv(nflds) != 0) {
-        return hs_error_code(self);
-    }
-
-    ptr->response_buf_remove();
-    if(ptr->get_error_code() < 0)
-    {
-        return hs_error_code(self);
+    result = ptr->response_recv(nflds);
+    if (result >= 0) {
+        ptr->response_buf_remove();
     }
 
     return hs_error_code(self);
@@ -266,21 +262,19 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
         return Qnil;
     }
 
-    VALUE retval = rb_ary_new2(2);
     size_t nflds = 0;
+    int   result = ptr->response_recv(nflds);
+    VALUE retval = rb_ary_new2(2);
 
-    if (ptr->response_recv(nflds) != 0) {
-        rb_ary_push(retval, FIX2INT(ptr->get_error_code()));
+    rb_ary_push(retval, INT2FIX(result));
+    if (result != 0) {
         rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
-        return retval;
+    } else {
+        rb_ary_push(retval, hs_get_resultset(ptr, nflds));
     }
 
-    rb_ary_push(retval, FIX2INT(ptr->get_error_code()));
-    rb_ary_push(retval, hs_get_resultset(ptr, nflds));
-
-    ptr->response_buf_remove();
-    if(ptr->get_error_code() < 0)
-    {
+    if (result >= 0) {
+        ptr->response_buf_remove();
     }
 
     return retval;
@@ -318,87 +312,40 @@ VALUE hs_execute_multi(int argc, VALUE *argv, VALUE self)
         modop   = rb_ary_entry(exec_arg, 5);
         modvals = rb_ary_entry(exec_arg, 6);
 
-        StringValue(op);
-        Check_Type(keys, T_ARRAY);
-
-        if (!NIL_P(modop)) {
-            StringValue(modop);
-        }
-
-        dena::string_ref op_ref, modop_ref;
-        std::vector<dena::string_ref> keyary, modary;
-
-        op_ref = dena::string_ref(RSTRING_PTR(op), RSTRING_LEN(op));
-        keys = ary_to_vector(keys, keyary);
-        rb_gc_register_address(&keys);
-
-        if (!NIL_P(modop)) {
-            modop_ref = dena::string_ref(RSTRING_PTR(modop), RSTRING_LEN(modop));
-            modvals = ary_to_vector(modvals, modary);
-            rb_gc_register_address(&modvals);
-        }
-
-        ptr->request_buf_exec_generic(NUM2INT(id),
-                                      op_ref,
-                                      &keyary[0], keyary.size(),
-                                      NUM2INT(limit), NUM2INT(skip),
-                                      modop_ref,
-                                      &modary[0], modary.size());
+        hs_prepare(ptr, id, op, keys, limit, skip, modop, modvals);
     }
 
     VALUE retvals, retval;
     retvals = rb_ary_new();
 
-    if (ptr->request_send() < 0) {
-        retval = rb_ary_new();
-
-        const int e = ptr->get_error_code();
-        const std::string s = ptr->get_error();
-        rb_ary_push(retval, FIX2INT(e));
-        rb_ary_push(retval, rb_str_new2(s.c_str()));
-
+    if (ptr->request_send() != 0) {
+        retval = rb_ary_new2(2);
+        rb_ary_push(retval, INT2FIX(ptr->get_error_code()));
+        rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
         rb_ary_push(retvals, retval);
         return retvals;
     }
 
     for (size_t i=0; i<RARRAY_LEN(exec_args); i++) {
-        retval = rb_ary_new();
-
         size_t nflds = 0;
-        const int e = ptr->response_recv(nflds);
-        rb_ary_push(retval, FIX2INT(e));
-        if (e != 0) {
-            const std::string s = ptr->get_error();
-            rb_ary_push(retval, rb_str_new2(s.c_str()));
-        } else {
-            VALUE arys, ary, val;
+        int   result = ptr->response_recv(nflds);
 
-            arys = rb_ary_new();
-            const dena::string_ref *row = 0;
-            while ((row = ptr->get_next_row()) != 0) {
-                ary = rb_ary_new2(nflds);
-                for (size_t i = 0; i < nflds; ++i) {
-                    const dena::string_ref& v = row[i];
-                    if (v.begin() != 0) {
-                        val = rb_str_new(v.begin(), v.size());
-                        rb_ary_push(ary, val);
-                    } else {
-                        rb_ary_push(ary, Qnil);
-                    }
-                }
-                rb_ary_push(arys, ary);
-            }
-            rb_ary_push(retval, arys);
+        retval = rb_ary_new2(2);
+        rb_ary_push(retval, INT2FIX(result));
+        if (result != 0) {
+            rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
+        } else {
+            rb_ary_push(retval, hs_get_resultset(ptr, nflds));
         }
 
-        if (e >= 0) {
+        if (result >= 0) {
             ptr->response_buf_remove();
         }
 
         rb_ary_push(retvals, retval);
 
-        if (e < 0) {
-            return retvals;
+        if (result < 0) {
+            break;
         }
     }
 
@@ -425,7 +372,7 @@ VALUE hs_execute_delete(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit,
 VALUE hs_execute_insert(VALUE self, VALUE id, VALUE fvals)
 {
     VALUE argv[5] = {
-        id, rb_str_new2("+"), fvals, 0, 0,
+        id, rb_str_new2("+"), fvals, INT2FIX(0), INT2FIX(0),
     };
     return hs_execute_single(5, argv, self);
 }
