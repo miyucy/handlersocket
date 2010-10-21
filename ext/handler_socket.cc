@@ -159,6 +159,28 @@ VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
     return ret;
 }
 
+VALUE hs_get_resultset(dena::hstcpcli_i *const ptr, size_t nflds)
+{
+    VALUE arys, ary, val;
+
+    arys = rb_ary_new();
+    const dena::string_ref *row = 0;
+    while ((row = ptr->get_next_row()) != 0) {
+        ary = rb_ary_new2(nflds);
+        for (size_t i = 0; i < nflds; ++i) {
+            const dena::string_ref& v = row[i];
+            if (v.begin() != 0) {
+                val = rb_str_new(v.begin(), v.size());
+                rb_ary_push(ary, val);
+            } else {
+                rb_ary_push(ary, Qnil);
+            }
+        }
+        rb_ary_push(arys, ary);
+    }
+    return arys;
+}
+
 VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 {
     HandlerSocket* hs;
@@ -217,24 +239,7 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
         const std::string s = ptr->get_error();
         rb_ary_push(retval, rb_str_new2(s.c_str()));
     } else {
-        VALUE arys, ary, val;
-
-        arys = rb_ary_new();
-        const dena::string_ref *row = 0;
-        while ((row = ptr->get_next_row()) != 0) {
-            ary = rb_ary_new2(nflds);
-            for (size_t i = 0; i < nflds; ++i) {
-                const dena::string_ref& v = row[i];
-                if (v.begin() != 0) {
-                    val = rb_str_new(v.begin(), v.size());
-                    rb_ary_push(ary, val);
-                } else {
-                    rb_ary_push(ary, Qnil);
-                }
-            }
-            rb_ary_push(arys, ary);
-        }
-        rb_ary_push(retval, arys);
+        rb_ary_push(retval, hs_get_resultset(ptr, nflds));
     }
 
     if (e >= 0) {
