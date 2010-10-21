@@ -181,15 +181,8 @@ VALUE hs_get_resultset(dena::hstcpcli_i *const ptr, size_t nflds)
     return arys;
 }
 
-VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
+void hs_prepare(dena::hstcpcli_i *const ptr, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modop, VALUE modvals)
 {
-    HandlerSocket* hs;
-    Data_Get_Struct(self, HandlerSocket, hs);
-    dena::hstcpcli_i *const ptr = hs->ptr;
-
-    VALUE id, op, keys, limit, skip, modop, modvals;
-    rb_scan_args(argc, argv, "52", &id, &op, &keys, &limit, &skip, &modop, &modvals);
-
     StringValue(op);
     Check_Type(keys, T_ARRAY);
 
@@ -202,12 +195,10 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
 
     op_ref = dena::string_ref(RSTRING_PTR(op), RSTRING_LEN(op));
     keys = ary_to_vector(keys, keyary);
-    rb_gc_register_address(&keys);
 
     if (!NIL_P(modop)) {
         modop_ref = dena::string_ref(RSTRING_PTR(modop), RSTRING_LEN(modop));
         modvals = ary_to_vector(modvals, modary);
-        rb_gc_register_address(&modvals);
     }
 
     ptr->request_buf_exec_generic(NUM2INT(id),
@@ -216,15 +207,20 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
                                   NUM2INT(limit), NUM2INT(skip),
                                   modop_ref,
                                   &modary[0], modary.size());
+}
 
+VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
+{
+    HandlerSocket* hs;
+    Data_Get_Struct(self, HandlerSocket, hs);
+    dena::hstcpcli_i *const ptr = hs->ptr;
+
+    VALUE id, op, keys, limit, skip, modop, modvals;
+    rb_scan_args(argc, argv, "52", &id, &op, &keys, &limit, &skip, &modop, &modvals);
+
+    hs_prepare(ptr, id, op, keys, limit, skip, modop, modvals);
     if (ptr->request_send() != 0) {
         return Qnil;
-    }
-
-    rb_gc_unregister_address(&keys);
-
-    if (!NIL_P(modop)) {
-        rb_gc_unregister_address(&modvals);
     }
 
     size_t nflds = 0;
