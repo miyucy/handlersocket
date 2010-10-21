@@ -101,23 +101,38 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
     HandlerSocket* hs;
     Data_Get_Struct(self, HandlerSocket, hs);
     dena::hstcpcli_i *const ptr = hs->ptr;
+    size_t  _id = NUM2INT(id);
+    VALUE   _db = rb_obj_dup(db),
+        _table  = rb_obj_dup(table),
+        _index  = rb_obj_dup(index),
+        _fields = rb_obj_dup(fields);
+    size_t nflds;
 
-    do {
-        size_t pst_id = NUM2INT(id);
-        ptr->request_buf_open_index(pst_id, StringValuePtr(db), StringValuePtr(table), StringValuePtr(index), StringValuePtr(fields));
-        if (ptr->request_send() != 0) {
-            break;
-        }
+    ptr->request_buf_open_index(_id,
+                                StringValueCStr(_db),
+                                StringValueCStr(_table),
+                                StringValueCStr(_index),
+                                StringValueCStr(_fields));
+    if(ptr->get_error_code() < 0)
+    {
+        return hs_error_code(self);
+    }
 
-        size_t nflds = 0;
-        ptr->response_recv(nflds);
-        const int e = ptr->get_error_code();
-        if (e >= 0) {
-            ptr->response_buf_remove();
-        }
-    } while(0);
+    if (ptr->request_send() != 0) {
+        return hs_error_code(self);
+    }
 
-    return INT2FIX(ptr->get_error_code());
+    if (ptr->response_recv(nflds) != 0) {
+        return hs_error_code(self);
+    }
+
+    ptr->response_buf_remove();
+    if(ptr->get_error_code() < 0)
+    {
+        return hs_error_code(self);
+    }
+
+    return hs_error_code(self);
 }
 
 VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
