@@ -7,7 +7,7 @@ typedef struct {
 
 void parse_options(dena::config&, dena::socket_args&, VALUE);
 
-VALUE hs_free(HandlerSocket* hs)
+void hs_free(HandlerSocket* hs)
 {
     if (hs) {
         if (hs->ptr) {
@@ -18,9 +18,13 @@ VALUE hs_free(HandlerSocket* hs)
     }
 }
 
+void hs_mark(HandlerSocket* hs)
+{
+}
+
 VALUE hs_alloc(VALUE self)
 {
-    return Data_Wrap_Struct(self, NULL, hs_free, 0);
+    return Data_Wrap_Struct(self, hs_mark, hs_free, 0);
 }
 
 VALUE hs_initialize(VALUE self, VALUE options)
