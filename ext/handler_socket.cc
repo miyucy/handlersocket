@@ -63,8 +63,7 @@ VALUE hs_reconnect(VALUE self)
     HandlerSocket* hs;
     Data_Get_Struct(self, HandlerSocket, hs);
 
-    int retval = hs->ptr->reconnect();
-    return INT2FIX(retval);
+    return INT2FIX(hs->ptr->reconnect());
 }
 
 VALUE hs_stable_point(VALUE self)
