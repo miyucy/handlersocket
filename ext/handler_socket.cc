@@ -223,23 +223,21 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
         return Qnil;
     }
 
+    VALUE retval = rb_ary_new2(2);
     size_t nflds = 0;
-    ptr->response_recv(nflds);
 
-    VALUE retval = rb_ary_new();
-
-    const int e = ptr->get_error_code();
-    rb_ary_push(retval, FIX2INT(e));
-
-    if (e != 0) {
-        const std::string s = ptr->get_error();
-        rb_ary_push(retval, rb_str_new2(s.c_str()));
-    } else {
-        rb_ary_push(retval, hs_get_resultset(ptr, nflds));
+    if (ptr->response_recv(nflds) != 0) {
+        rb_ary_push(retval, FIX2INT(ptr->get_error_code()));
+        rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
+        return retval;
     }
 
-    if (e >= 0) {
-      ptr->response_buf_remove();
+    rb_ary_push(retval, FIX2INT(ptr->get_error_code()));
+    rb_ary_push(retval, hs_get_resultset(ptr, nflds));
+
+    ptr->response_buf_remove();
+    if(ptr->get_error_code() < 0)
+    {
     }
 
     return retval;
