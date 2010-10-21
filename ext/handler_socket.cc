@@ -5,8 +5,6 @@ typedef struct {
     dena::hstcpcli_i *ptr;
 } HandlerSocket;
 
-void parse_options(dena::config&, dena::socket_args&, VALUE);
-
 void hs_free(HandlerSocket* hs)
 {
     if (hs) {
@@ -25,6 +23,51 @@ void hs_mark(HandlerSocket* hs)
 VALUE hs_alloc(VALUE self)
 {
     return Data_Wrap_Struct(self, hs_mark, hs_free, 0);
+}
+
+void parse_options(dena::config& conf, dena::socket_args& args, VALUE options)
+{
+    VALUE val;
+
+    Check_Type(options, T_HASH);
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("host")));
+    if(val != Qnil)
+    {
+        conf["host"] = std::string(StringValuePtr(val));
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("port")));
+    if(val != Qnil)
+    {
+        conf["port"] = std::string(StringValuePtr(val));
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("timeout")));
+    if(val != Qnil)
+    {
+        conf["timeout"] = std::string(StringValuePtr(val));
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("listen_backlog")));
+    if(val != Qnil)
+    {
+        conf["listen_backlog"] = std::string(StringValuePtr(val));
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("sndbuf")));
+    if(val != Qnil)
+    {
+        conf["sndbuf"] = std::string(StringValuePtr(val));
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("rcvbuf")));
+    if(val != Qnil)
+    {
+        conf["rcvbuf"] = std::string(StringValuePtr(val));
+    }
+
+    args.set(conf);
 }
 
 VALUE hs_initialize(VALUE self, VALUE options)
@@ -385,51 +428,6 @@ VALUE hs_execute_insert(VALUE self, VALUE id, VALUE fvals)
         id, rb_str_new2("+"), fvals, 0, 0,
     };
     return hs_execute_single(5, argv, self);
-}
-
-void parse_options(dena::config& conf, dena::socket_args& args, VALUE options)
-{
-    VALUE val;
-
-    Check_Type(options, T_HASH);
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("host")));
-    if(val != Qnil)
-    {
-        conf["host"] = std::string(StringValuePtr(val));
-    }
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("port")));
-    if(val != Qnil)
-    {
-        conf["port"] = std::string(StringValuePtr(val));
-    }
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("timeout")));
-    if(val != Qnil)
-    {
-        conf["timeout"] = std::string(StringValuePtr(val));
-    }
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("listen_backlog")));
-    if(val != Qnil)
-    {
-        conf["listen_backlog"] = std::string(StringValuePtr(val));
-    }
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("sndbuf")));
-    if(val != Qnil)
-    {
-        conf["sndbuf"] = std::string(StringValuePtr(val));
-    }
-
-    val = rb_hash_aref(options, ID2SYM(rb_intern("rcvbuf")));
-    if(val != Qnil)
-    {
-        conf["rcvbuf"] = std::string(StringValuePtr(val));
-    }
-
-    args.set(conf);
 }
 
 extern "C" {
