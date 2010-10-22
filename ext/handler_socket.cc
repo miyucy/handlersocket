@@ -240,6 +240,14 @@ void hs_prepare(dena::hstcpcli_i *const ptr, VALUE id, VALUE op, VALUE keys, VAL
         modvals = ary_to_vector(modvals, modary);
     }
 
+    if (NIL_P(limit)) {
+        limit = INT2FIX(1);
+    }
+
+    if (NIL_P(skip)) {
+        skip = INT2FIX(0);
+    }
+
     ptr->request_buf_exec_generic(NUM2INT(id),
                                   op_ref,
                                   &keyary[0], keyary.size(),
@@ -255,7 +263,7 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
     dena::hstcpcli_i *const ptr = hs->ptr;
 
     VALUE id, op, keys, limit, skip, modop, modvals;
-    rb_scan_args(argc, argv, "52", &id, &op, &keys, &limit, &skip, &modop, &modvals);
+    rb_scan_args(argc, argv, "34", &id, &op, &keys, &limit, &skip, &modop, &modvals);
 
     hs_prepare(ptr, id, op, keys, limit, skip, modop, modvals);
     if (ptr->request_send() != 0) {
@@ -290,9 +298,9 @@ VALUE hs_execute_multi(int argc, VALUE *argv, VALUE self)
 
     VALUE id, op, keys, limit, skip, modop, modvals;
     int arg = rb_scan_args(argc, argv, "16", &id, &op, &keys, &limit, &skip, &modop, &modvals);
-    if (arg >= 5) {
-        VALUE tmp = rb_ary_new3(id, op, keys, limit, skip, modop, modvals);
-        exec_args = rb_ary_new3(tmp);
+    if (arg >= 3) {
+        VALUE tmp = rb_ary_new3(7, id, op, keys, limit, skip, modop, modvals);
+        exec_args = rb_ary_new3(1, tmp);
     } else if (arg == 1) {
         Check_Type(id, T_ARRAY);
         exec_args = id;
