@@ -1,8 +1,15 @@
 #include <ruby.h>
+#ifdef HAVE_RUBY_ENCODING_H
+#include <ruby/encoding.h>
+#endif
 #include "hstcpcli.hpp"
 
 typedef struct {
     dena::hstcpcli_i *ptr;
+#ifdef HAVE_RUBY_ENCODING_H
+    rb_encoding *server_encoding;
+    rb_encoding *client_encoding;
+#endif
 } HandlerSocket;
 
 void hs_free(HandlerSocket* hs)
@@ -70,6 +77,32 @@ void parse_options(dena::config& conf, dena::socket_args& args, VALUE options)
     args.set(conf);
 }
 
+#ifdef HAVE_RUBY_ENCODING_H
+rb_encoding* encoding_options(HandlerSocket* hs, VALUE options)
+{
+    rb_encoding *enc;
+    VALUE        val;
+
+    Check_Type(options, T_HASH);
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("server_encoding")));
+    if (val != Qnil) {
+        hs->server_encoding = rb_to_encoding(val);
+    } else {
+        hs->server_encoding = rb_utf8_encoding();
+    }
+
+    val = rb_hash_aref(options, ID2SYM(rb_intern("client_encoding")));
+    if(val != Qnil) {
+        hs->client_encoding = rb_to_encoding(val);
+    } else {
+        hs->client_encoding = rb_utf8_encoding();
+    }
+
+    return enc;
+}
+#endif
+
 VALUE hs_initialize(VALUE self, VALUE options)
 {
     HandlerSocket* hs;
@@ -88,6 +121,10 @@ VALUE hs_initialize(VALUE self, VALUE options)
     dena::hstcpcli_ptr ptr = dena::hstcpcli_i::create(args);
     hs->ptr = ptr.get();
     ptr.release();
+
+#ifdef HAVE_RUBY_ENCODING_H
+    encoding_options(hs, options);
+#endif
 
     return self;
 }
@@ -174,7 +211,7 @@ VALUE hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VA
     return hs_error_code(self);
 }
 
-VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
+VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec, HandlerSocket* hs)
 {
     VALUE ret, val;
 
@@ -191,6 +228,9 @@ VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
             val = rb_fix2str(val, 10);
         }
         StringValue(val);
+#ifdef RUBY_ENCODING_H
+        val = rb_str_export_to_enc(val, hs->server_encoding);
+#endif
         vec.push_back(dena::string_ref(RSTRING_PTR(val), RSTRING_LEN(val)));
         rb_ary_push(ret, val);
     }
@@ -198,8 +238,12 @@ VALUE ary_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
     return ret;
 }
 
-VALUE hs_get_resultset(dena::hstcpcli_i *const ptr, size_t nflds)
+VALUE hs_get_resultset(HandlerSocket* hs, size_t nflds)
 {
+    dena::hstcpcli_i *const ptr = hs->ptr;
+#ifdef RUBY_ENCODING_H
+    rb_encoding *internal_encoding = rb_default_internal_encoding();;
+#endif
     VALUE arys, ary, val;
 
     arys = rb_ary_new();
@@ -210,6 +254,12 @@ VALUE hs_get_resultset(dena::hstcpcli_i *const ptr, size_t nflds)
             const dena::string_ref& v = row[i];
             if (v.begin() != 0) {
                 val = rb_str_new(v.begin(), v.size());
+#ifdef RUBY_ENCODING_H
+                rb_enc_associate(val, hs->client_encoding);
+                if (internal_encoding) {
+                    rb_str_export_to_enc(val, internal_encoding);
+                }
+#endif
                 rb_ary_push(ary, val);
             } else {
                 rb_ary_push(ary, Qnil);
@@ -220,8 +270,10 @@ VALUE hs_get_resultset(dena::hstcpcli_i *const ptr, size_t nflds)
     return arys;
 }
 
-void hs_prepare(dena::hstcpcli_i *const ptr, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modop, VALUE modvals)
+void hs_prepare(HandlerSocket* hs, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modop, VALUE modvals)
 {
+    dena::hstcpcli_i *const ptr = hs->ptr;
+
     StringValue(op);
     Check_Type(keys, T_ARRAY);
 
@@ -233,11 +285,11 @@ void hs_prepare(dena::hstcpcli_i *const ptr, VALUE id, VALUE op, VALUE keys, VAL
     std::vector<dena::string_ref> keyary, modary;
 
     op_ref = dena::string_ref(RSTRING_PTR(op), RSTRING_LEN(op));
-    keys = ary_to_vector(keys, keyary);
+    keys = ary_to_vector(keys, keyary, hs);
 
     if (!NIL_P(modop)) {
         modop_ref = dena::string_ref(RSTRING_PTR(modop), RSTRING_LEN(modop));
-        modvals = ary_to_vector(modvals, modary);
+        modvals = ary_to_vector(modvals, modary, hs);
     }
 
     if (NIL_P(limit)) {
@@ -265,7 +317,7 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
     VALUE id, op, keys, limit, skip, modop, modvals;
     rb_scan_args(argc, argv, "34", &id, &op, &keys, &limit, &skip, &modop, &modvals);
 
-    hs_prepare(ptr, id, op, keys, limit, skip, modop, modvals);
+    hs_prepare(hs, id, op, keys, limit, skip, modop, modvals);
     if (ptr->request_send() != 0) {
         return Qnil;
     }
@@ -278,7 +330,7 @@ VALUE hs_execute_single(int argc, VALUE *argv, VALUE self)
     if (result != 0) {
         rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
     } else {
-        rb_ary_push(retval, hs_get_resultset(ptr, nflds));
+        rb_ary_push(retval, hs_get_resultset(hs, nflds));
     }
 
     if (result >= 0) {
@@ -320,7 +372,7 @@ VALUE hs_execute_multi(int argc, VALUE *argv, VALUE self)
         modop   = rb_ary_entry(exec_arg, 5);
         modvals = rb_ary_entry(exec_arg, 6);
 
-        hs_prepare(ptr, id, op, keys, limit, skip, modop, modvals);
+        hs_prepare(hs, id, op, keys, limit, skip, modop, modvals);
     }
 
     VALUE retvals, retval;
@@ -343,7 +395,7 @@ VALUE hs_execute_multi(int argc, VALUE *argv, VALUE self)
         if (result != 0) {
             rb_ary_push(retval, rb_str_new2(ptr->get_error().c_str()));
         } else {
-            rb_ary_push(retval, hs_get_resultset(ptr, nflds));
+            rb_ary_push(retval, hs_get_resultset(hs, nflds));
         }
 
         if (result >= 0) {
