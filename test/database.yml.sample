@@ -1,0 +1,10 @@
+db: hstest
+my:
+  host:     127.0.0.1
+  port:     3306
+  socket:   /tmp/mysql.sock
+  username: root
+  password:
+hs:
+  host: '127.0.0.1'
+  port: '9998'
