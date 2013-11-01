@@ -10,7 +10,10 @@ file "ext/handler_socket.#{DLEXT}" => Dir.glob("ext/*{.rb,.c,.cc}") do
      ruby "extconf.rb"
      sh "make"
   end
-  cp "ext/handler_socket.#{DLEXT}", "lib"
+end
+
+file "lib/handler_socket.#{DLEXT}" => "ext/handler_socket.#{DLEXT}" do
+  cp "ext/handler_socket.#{DLEXT}", "lib/handler_socket.#{DLEXT}"
 end
 
 Rake::TestTask.new do |t|
@@ -20,6 +23,6 @@ Rake::TestTask.new do |t|
   t.test_files = FileList['test/**/*_test.rb']
   t.verbose = true
 end
-task test: "ext/handler_socket.#{DLEXT}"
+task test: "lib/handler_socket.#{DLEXT}"
 
 task default: :test
