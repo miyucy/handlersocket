@@ -7,6 +7,7 @@
 
 typedef struct {
     dena::hstcpcli_i* ptr;
+    size_t last_id;
 } HandlerSocket;
 
 static VALUE rb_cHandlerSocket;
@@ -188,6 +189,8 @@ hs_initialize(VALUE self, VALUE options)
     hs->ptr = ptr.get();
     ptr.release();
 
+    hs->last_id = 0;
+
     return self;
 }
 
@@ -199,6 +202,7 @@ hs_close(VALUE self)
     GetHandlerSocket(self, hs);
 
     hs->ptr->close();
+    hs->last_id = 0;
 
     return Qnil;
 }
@@ -253,19 +257,18 @@ hs_error_code(VALUE self)
 }
 
 VALUE
-hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VALUE fields)
+hs_open_index(VALUE self, VALUE db, VALUE table, VALUE index, VALUE fields)
 {
     HandlerSocket* hs;
 
     GetHandlerSocket(self, hs);
 
-    size_t _id     = NUM2INT(id);
     VALUE  _db     = rb_obj_dup(db);
     VALUE  _table  = rb_obj_dup(table);
     VALUE  _index  = rb_obj_dup(index);
     VALUE  _fields = rb_obj_dup(fields);
 
-    hs->ptr->request_buf_open_index(_id,
+    hs->ptr->request_buf_open_index(hs->last_id,
                                     StringValueCStr(_db),
                                     StringValueCStr(_table),
                                     StringValueCStr(_index),
@@ -292,7 +295,7 @@ hs_open_index(VALUE self, VALUE id, VALUE db, VALUE table, VALUE index, VALUE fi
         rb_raise(rb_eHandlerSocketError, "response_buf_remove: %s", hs->ptr->get_error().c_str());
     }
 
-    return id;
+    return INT2NUM(hs->last_id++);
 }
 
 VALUE
@@ -469,7 +472,7 @@ extern "C" {
         rb_define_method(rb_cHandlerSocket, "error", (VALUE(*)(...))hs_error, 0);
         rb_define_method(rb_cHandlerSocket, "error_code", (VALUE(*)(...))hs_error_code, 0);
 
-        rb_define_method(rb_cHandlerSocket, "open_index", (VALUE(*)(...))hs_open_index, 5);
+        rb_define_method(rb_cHandlerSocket, "open_index", (VALUE(*)(...))hs_open_index, 4);
         rb_define_method(rb_cHandlerSocket, "execute_single", (VALUE(*)(...))hs_execute_single, -1);
         rb_define_alias(rb_cHandlerSocket, "execute_find", "execute_single");
         rb_define_method(rb_cHandlerSocket, "execute_multi", (VALUE(*)(...))hs_execute_multi, -1);

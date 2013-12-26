@@ -39,13 +39,14 @@ describe HandlerSocket do
     REPEAT = 1000
     @rw = false
 
+    attr_reader :idx
     def initialize(repo)
       opt = {
         host: $conf['hs']['host'],
         port: $conf['hs'][self.class.instance_variable_get(:@rw) ? 'port_wr' : 'port'],
       }
       @hs = HandlerSocket.new opt
-      @hs.open_index 0, $conf['db'], 'table2', 'PRIMARY', 'k,v1,v2,v3'
+      @idx = @hs.open_index $conf['db'], 'table2', 'PRIMARY', 'k,v1,v2,v3'
       @repo = repo
       @runner = runner
     end
@@ -66,7 +67,7 @@ describe HandlerSocket do
       Thread.new do
         REPEAT.times do
           @repo.use do |rec|
-            res = @hs.execute_delete 0, '=', [rec.k], 1, 0
+            res = @hs.execute_delete idx, '=', [rec.k], 1, 0
             if rec.deleted
               raise unless res == [0, [['0']]]
             else
@@ -92,7 +93,7 @@ describe HandlerSocket do
             v2 = "iv2_#{rec.k}_#{SecureRandom.hex 4}"
             v3 = "iv3_#{rec.k}_#{SecureRandom.hex 4}"
             begin
-              res = @hs.execute_insert 0, [rec.k, v1, v2, v3]
+              res = @hs.execute_insert idx, [rec.k, v1, v2, v3]
               raise unless res == [0, []]
               rec.deleted = false
               rec.v1, rec.v2, rec.v3 = v1, v2, v3
@@ -117,7 +118,7 @@ describe HandlerSocket do
             v1 = "wv1_#{rec.k}_#{SecureRandom.hex 4}"
             v2 = "wv2_#{rec.k}_#{SecureRandom.hex 4}"
             v3 = "wv3_#{rec.k}_#{SecureRandom.hex 4}"
-            res = @hs.execute_update 0, '=', [rec.k], 1, 0, [rec.k, v1, v2, v3]
+            res = @hs.execute_update idx, '=', [rec.k], 1, 0, [rec.k, v1, v2, v3]
             if rec.deleted
               raise unless res == [0, [['0']]]
             else
@@ -137,7 +138,7 @@ describe HandlerSocket do
       Thread.new do
         REPEAT.times do
           @repo.use do |rec|
-            res = @hs.execute_single 0, '=', [rec.k], 1, 0
+            res = @hs.execute_single idx, '=', [rec.k], 1, 0
             if rec.deleted
               raise unless res == [0, []]
             else

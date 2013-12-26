@@ -12,25 +12,41 @@ describe HandlerSocket do
 
   describe '#open_index' do
     it 'return opened index number' do
-      res = hs.open_index 0, $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      res = hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
       res.must_equal 0
     end
 
-    it 'return opened index number' do
-      idx = rand 1..100
-      res = hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
-      res.must_equal idx
+    it 'increment index number' do
+      hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      res = hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      res.must_equal 2
+    end
+
+    it 'can not obtain new index number when closed' do
+      hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      hs.close
+      -> {
+        hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      }.must_raise HandlerSocket::IOError
+    end
+
+    it 'can not execute after connection closed' do
+      idx = hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v'
+      hs.close
+      -> {
+        hs.execute_single idx, '=', ['foo'], 1, 0
+      }.must_raise HandlerSocket::IOError
     end
   end
 
   describe '#execute_single' do
     let(:key) { SecureRandom.hex 16 }
     let(:val) { SecureRandom.hex 16 }
-    let(:idx) { rand 1..100 }
+    let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     before do
       mysql.query %{INSERT INTO table1 VALUES ('#{mysql.escape key}', '#{mysql.escape val}')}
-      hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
     end
 
     it 'return value' do
@@ -50,15 +66,14 @@ describe HandlerSocket do
   end
 
   describe '#execute_multi' do
-    let(:idx) { rand 1..100 }
     let(:keys) { 10.times.map { SecureRandom.hex 16 } }
     let(:vals) { 10.times.map { SecureRandom.hex 16 } }
+    let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     before do
       keys.zip(vals).each do |key, val|
         mysql.query %{INSERT INTO table1 VALUES ('#{mysql.escape key}', '#{mysql.escape val}')}
       end
-      hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
     end
 
     it 'return value' do
@@ -88,11 +103,7 @@ describe HandlerSocket do
 
   describe '#execute_insert' do
     let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port_wr'] }
-    let(:idx) { rand 1..100 }
-
-    before do
-      hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
-    end
+    let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     it 'return value' do
       key = SecureRandom.hex
@@ -123,11 +134,10 @@ describe HandlerSocket do
     let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port_wr'] }
     let(:key) { SecureRandom.hex 16 }
     let(:val) { SecureRandom.hex 16 }
-    let(:idx) { rand 1..100 }
+    let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     before do
       mysql.query %{INSERT INTO table1 VALUES ('#{mysql.escape key}', '#{mysql.escape val}')}
-      hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
     end
 
     it 'return value' do
@@ -162,13 +172,12 @@ describe HandlerSocket do
     let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port_wr'] }
     let(:key) { SecureRandom.hex 16 }
     let(:val) { SecureRandom.hex 16 }
-    let(:idx) { rand 1..100 }
     let(:newval) { SecureRandom.hex 16 }
     let(:newkey) { SecureRandom.hex 16 }
+    let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     before do
       mysql.query %{INSERT INTO table1 VALUES ('#{mysql.escape key}', '#{mysql.escape val}')}
-      hs.open_index idx, $conf['db'], 'table1', 'PRIMARY', 'k,v'
     end
 
     it 'return value' do
