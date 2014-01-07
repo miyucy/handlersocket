@@ -15,7 +15,7 @@ static VALUE rb_eHandlerSocketIOError;
 static VALUE rb_eHandlerSocketError;
 
 /* hs['str'] || hs[:str] */
-VALUE
+static VALUE
 hs_hash_aref(VALUE hash, const char* ptr)
 {
   VALUE key = rb_str_new2(ptr);
@@ -27,7 +27,7 @@ hs_hash_aref(VALUE hash, const char* ptr)
   }
 }
 
-void
+static void
 hs_parse_options(dena::socket_args& args, VALUE options)
 {
     dena::config conf;
@@ -84,7 +84,7 @@ hs_parse_options(dena::socket_args& args, VALUE options)
     }
 }
 
-void
+static void
 hs_array_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
 {
     if (NIL_P(ary) || RARRAY_LEN(ary) == 0) {
@@ -108,7 +108,7 @@ hs_array_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
     }
 }
 
-VALUE
+static VALUE
 hs_get_resultset(HandlerSocket* const hs, const size_t nflds)
 {
     VALUE arys = rb_ary_new();
@@ -130,7 +130,7 @@ hs_get_resultset(HandlerSocket* const hs, const size_t nflds)
     return arys;
 }
 
-void
+static void
 hs_prepare(HandlerSocket* const hs, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modop, VALUE modvals)
 {
     StringValue(op);
@@ -170,7 +170,7 @@ hs_prepare(HandlerSocket* const hs, VALUE id, VALUE op, VALUE keys, VALUE limit,
                                       modary.size());
 }
 
-void
+static void
 hs_free(HandlerSocket* hs)
 {
     if (hs) {
@@ -182,12 +182,12 @@ hs_free(HandlerSocket* hs)
     }
 }
 
-void
+static void
 hs_mark(HandlerSocket* hs)
 {
 }
 
-VALUE
+static VALUE
 hs_alloc(VALUE klass)
 {
     HandlerSocket* hs = ALLOC(HandlerSocket);
@@ -195,7 +195,7 @@ hs_alloc(VALUE klass)
     return Data_Wrap_Struct(klass, hs_mark, hs_free, hs);
 }
 
-VALUE
+static VALUE
 hs_initialize(VALUE self, VALUE options)
 {
     HandlerSocket* hs;
@@ -215,7 +215,7 @@ hs_initialize(VALUE self, VALUE options)
     return self;
 }
 
-VALUE
+static VALUE
 hs_close(VALUE self)
 {
     HandlerSocket* hs;
@@ -228,7 +228,7 @@ hs_close(VALUE self)
     return Qnil;
 }
 
-VALUE
+static VALUE
 hs_reconnect(VALUE self)
 {
     HandlerSocket* hs;
@@ -245,7 +245,7 @@ hs_reconnect(VALUE self)
 /*
   returns true if cli can send a new request
 */
-VALUE
+static VALUE
 hs_stable_point(VALUE self)
 {
     HandlerSocket* hs;
@@ -255,7 +255,7 @@ hs_stable_point(VALUE self)
     return hs->ptr->stable_point() ? Qtrue : Qfalse;
 }
 
-VALUE
+static VALUE
 hs_error(VALUE self)
 {
     HandlerSocket* hs;
@@ -267,7 +267,7 @@ hs_error(VALUE self)
     return error.empty() ? Qnil : rb_str_new2(error.c_str());
 }
 
-VALUE
+static VALUE
 hs_error_code(VALUE self)
 {
     HandlerSocket* hs;
@@ -277,7 +277,7 @@ hs_error_code(VALUE self)
     return INT2FIX(hs->ptr->get_error_code());
 }
 
-VALUE
+static VALUE
 hs_open_index(VALUE self, VALUE db, VALUE table, VALUE index, VALUE fields)
 {
     HandlerSocket* hs;
@@ -319,7 +319,7 @@ hs_open_index(VALUE self, VALUE db, VALUE table, VALUE index, VALUE fields)
     return INT2NUM(hs->last_id++);
 }
 
-VALUE
+static VALUE
 hs_execute_single(int argc, VALUE *argv, VALUE self)
 {
     HandlerSocket* hs;
@@ -355,7 +355,7 @@ hs_execute_single(int argc, VALUE *argv, VALUE self)
     return Qnil;
 }
 
-VALUE
+static VALUE
 hs_execute_multi(int argc, VALUE *argv, VALUE self)
 {
     HandlerSocket* hs;
@@ -421,7 +421,7 @@ hs_execute_multi(int argc, VALUE *argv, VALUE self)
     return retvals;
 }
 
-VALUE
+static VALUE
 hs_execute_update(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip, VALUE modvals)
 {
     VALUE argv[7] = {
@@ -430,7 +430,7 @@ hs_execute_update(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE
     return hs_execute_single(7, argv, self);
 }
 
-VALUE
+static VALUE
 hs_execute_delete(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE skip)
 {
     VALUE argv[7] = {
@@ -439,7 +439,7 @@ hs_execute_delete(VALUE self, VALUE id, VALUE op, VALUE keys, VALUE limit, VALUE
     return hs_execute_single(7, argv, self);
 }
 
-VALUE
+static VALUE
 hs_execute_insert(VALUE self, VALUE id, VALUE fvals)
 {
     VALUE argv[5] = {
@@ -448,7 +448,7 @@ hs_execute_insert(VALUE self, VALUE id, VALUE fvals)
     return hs_execute_single(5, argv, self);
 }
 
-VALUE
+static VALUE
 hs_auth(VALUE self, VALUE secret, VALUE type)
 {
     HandlerSocket* hs;
