@@ -44,4 +44,4 @@ $CPPFLAGS = $CPPFLAGS.sub '-x c++ ', ''
 
 have_library 'hsclient'
 have_library 'stdc++'
-create_makefile 'handler_socket'
+create_makefile 'handlersocket_ext'

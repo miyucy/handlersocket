@@ -5,15 +5,15 @@ require "rbconfig"
 
 DLEXT = RbConfig::CONFIG["DLEXT"]
 
-file "ext/handler_socket.#{DLEXT}" => Dir.glob("ext/*{.rb,.c,.cc}") do
+file "ext/handlersocket_ext.#{DLEXT}" => Dir.glob("ext/*{.rb,.c,.cc}") do
   Dir.chdir("ext") do
      ruby "extconf.rb"
      sh "make"
   end
 end
 
-file "lib/handler_socket.#{DLEXT}" => "ext/handler_socket.#{DLEXT}" do
-  cp "ext/handler_socket.#{DLEXT}", "lib/handler_socket.#{DLEXT}"
+file "lib/handlersocket_ext.#{DLEXT}" => "ext/handlersocket_ext.#{DLEXT}" do
+  cp "ext/handlersocket_ext.#{DLEXT}", "lib/handlersocket_ext.#{DLEXT}"
 end
 
 Rake::TestTask.new do |t|
@@ -23,7 +23,7 @@ Rake::TestTask.new do |t|
   t.test_files = FileList['test/**/*_test.rb']
   t.verbose = true
 end
-task test: "lib/handler_socket.#{DLEXT}"
+task test: "lib/handlersocket_ext.#{DLEXT}"
 
 task default: :test
 

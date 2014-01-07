@@ -148,10 +148,13 @@ hs_prepare(HandlerSocket* const hs, VALUE id, VALUE op, VALUE keys, VALUE limit,
 
     hs->ptr->request_buf_exec_generic(NUM2INT(id),
                                       op_ref,
-                                      &keyary[0], keyary.size(),
-                                      NUM2INT(limit), NUM2INT(skip),
+                                      &keyary[0],
+                                      keyary.size(),
+                                      NUM2INT(limit),
+                                      NUM2INT(skip),
                                       modop_ref,
-                                      &modary[0], modary.size());
+                                      &modary[0],
+                                      modary.size());
 }
 
 void
@@ -463,7 +466,7 @@ hs_auth(VALUE self, VALUE secret, VALUE type)
 
 extern "C" {
     void
-    Init_handler_socket(void)
+    Init_handlersocket_ext(void)
     {
         rb_cHandlerSocket = rb_define_class("HandlerSocket", rb_cObject);
         rb_define_alloc_func(rb_cHandlerSocket, hs_alloc);
