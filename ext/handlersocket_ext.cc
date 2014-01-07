@@ -14,6 +14,19 @@ static VALUE rb_cHandlerSocket;
 static VALUE rb_eHandlerSocketIOError;
 static VALUE rb_eHandlerSocketError;
 
+/* hs['str'] || hs[:str] */
+VALUE
+hs_hash_aref(VALUE hash, const char* ptr)
+{
+  VALUE key = rb_str_new2(ptr);
+  VALUE val = rb_hash_aref(hash, key);
+  if (NIL_P(val)) {
+    return rb_hash_aref(hash, rb_str_intern(key));
+  } else {
+    return val;
+  }
+}
+
 void
 hs_parse_options(dena::socket_args& args, VALUE options)
 {
@@ -22,50 +35,50 @@ hs_parse_options(dena::socket_args& args, VALUE options)
 
     Check_Type(options, T_HASH);
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("host")));
+    val = hs_hash_aref(options, "host");
     if (!NIL_P(val)) {
         conf["host"] = std::string(StringValuePtr(val));
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("port")));
+    val = hs_hash_aref(options, "port");
     if (!NIL_P(val)) {
         val = rb_convert_type(val, T_STRING, "String", "to_s");
         conf["port"] = std::string(RSTRING_PTR(val));
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("timeout")));
+    val = hs_hash_aref(options, "timeout");
     if (!NIL_P(val)) {
         conf["timeout"] = std::string(StringValuePtr(val));
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("listen_backlog")));
+    val = hs_hash_aref(options, "listen_backlog");
     if (!NIL_P(val)) {
         conf["listen_backlog"] = std::string(StringValuePtr(val));
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("sndbuf")));
+    val = hs_hash_aref(options, "sndbuf");
     if (!NIL_P(val)) {
         conf["sndbuf"] = std::string(StringValuePtr(val));
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("rcvbuf")));
+    val = hs_hash_aref(options, "rcvbuf");
     if (!NIL_P(val)) {
         conf["rcvbuf"] = std::string(StringValuePtr(val));
     }
 
     args.set(conf);
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("reuseaddr")));
+    val = hs_hash_aref(options, "reuseaddr");
     if (!NIL_P(val)) {
         args.reuseaddr = val == Qtrue;
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("nonblocking")));
+    val = hs_hash_aref(options, "nonblocking");
     if (!NIL_P(val)) {
         args.nonblocking = val == Qtrue;
     }
 
-    val = rb_hash_aref(options, ID2SYM(rb_intern("use_epoll")));
+    val = hs_hash_aref(options, "use_epoll");
     if (!NIL_P(val)) {
         args.use_epoll = val == Qtrue;
     }
