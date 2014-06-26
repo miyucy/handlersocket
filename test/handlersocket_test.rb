@@ -7,7 +7,7 @@ describe HandlerSocket do
 
   let(:mysql) { $mysql }
   let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port'] }
-  before { mysql.query %{TRUNCATE TABLE table1} }
+  before { mysql.query %{DELETE FROM table1} }
   after  { hs.close }
 
   describe '#open_index' do
