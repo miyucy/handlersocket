@@ -26,3 +26,14 @@ end
 task test: "lib/handler_socket.#{DLEXT}"
 
 task default: :test
+
+%W[
+  ext/*.bundle
+  lib/*.bundle
+  ext/Makefile
+  ext/*.o
+  ext/*.log
+].each do |file|
+  CLOBBER.include file
+end
+
