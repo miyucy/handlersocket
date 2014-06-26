@@ -82,11 +82,16 @@ hs_array_to_vector(VALUE ary, std::vector<dena::string_ref>& vec)
 
     for (size_t i=0, n=RARRAY_LEN(ary); i<n; i++) {
         VALUE val = rb_ary_entry(ary, i);
-        if (FIXNUM_P(val)) {
-            val = rb_fix2str(val, 10);
+
+        if (NIL_P(val)) {
+            vec.push_back(dena::string_ref(NULL, 1));
+        } else {
+            if (FIXNUM_P(val)) {
+                val = rb_fix2str(val, 10);
+            }
+            StringValue(val);
+            vec.push_back(dena::string_ref(RSTRING_PTR(val), RSTRING_LEN(val)));
         }
-        StringValue(val);
-        vec.push_back(dena::string_ref(RSTRING_PTR(val), RSTRING_LEN(val)));
     }
 }
 

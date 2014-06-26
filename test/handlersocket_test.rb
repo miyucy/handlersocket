@@ -7,7 +7,7 @@ describe HandlerSocket do
 
   let(:mysql) { $mysql }
   let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port'] }
-  before { mysql.query %{TRUNCATE TABLE table1} }
+  before { mysql.query %{DELETE FROM table1} }
   after  { hs.close }
 
   describe '#open_index' do
@@ -104,6 +104,7 @@ describe HandlerSocket do
   describe '#execute_insert' do
     let(:hs) { HandlerSocket.new :host => $conf['hs']['host'], :port => $conf['hs']['port_wr'] }
     let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
+    let(:nulval) { nil }
 
     it 'return value' do
       key = SecureRandom.hex
@@ -127,6 +128,13 @@ describe HandlerSocket do
       -> {
         hs.execute_insert idx, [key, SecureRandom.hex]
       }.must_raise HandlerSocket::Error
+    end
+
+    it 'return value' do
+      key = SecureRandom.hex
+      hs.execute_insert idx, [key, nulval]
+      row = mysql.query(%{SELECT COUNT(*) FROM table1 WHERE v IS NULL}).first
+      row['COUNT(*)'].must_equal 1
     end
   end
 
@@ -174,6 +182,7 @@ describe HandlerSocket do
     let(:val) { SecureRandom.hex 16 }
     let(:newval) { SecureRandom.hex 16 }
     let(:newkey) { SecureRandom.hex 16 }
+    let(:nulval) { nil }
     let(:idx) { hs.open_index $conf['db'], 'table1', 'PRIMARY', 'k,v' }
 
     before do
@@ -239,6 +248,14 @@ describe HandlerSocket do
     it 'return value' do
       res = hs.execute_update idx, '=', [newkey], 1, 0, [newkey, newval]
       res.must_equal [0, [['0']]]
+    end
+
+    it 'return value' do
+      hs.execute_update idx, '=', [key], 1, 0, [newkey, nulval]
+      row = mysql.query(%{SELECT * FROM table1 WHERE k = '#{mysql.escape newkey}'}).first
+      row['v'].must_equal nulval
+      row = mysql.query(%{SELECT * FROM table1 WHERE v IS NULL}).first
+      row['k'].must_equal newkey
     end
   end
 end

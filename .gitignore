@@ -16,3 +16,8 @@ test/tmp
 test/version_tmp
 tmp
 test/database.yml
+lib/*.bundle
+ext/*.bundle
+ext/Makefile
+ext/*.o
+ext/*.log
