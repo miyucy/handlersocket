@@ -5,3 +5,4 @@ gemspec
 
 gem 'mysql2'
 gem 'pry-byebug'
+gem 'minitest'
